@@ -1,0 +1,172 @@
+CREATE SCHEMA CompanySchema1;
+CREATE DATABASE EmployeeDB;
+
+USE EmployeeDB;
+
+CREATE TABLE CompanySchema1.Employees (
+    EmployeeID INT PRIMARY KEY,
+    FirstName NVARCHAR(50),
+    LastName NVARCHAR(50),
+    Department NVARCHAR(50),
+    Salary DECIMAL(10, 2)
+);
+
+INSERT INTO CompanySchema1.Employees (EmployeeID, FirstName, LastName, Department, Salary) VALUES
+(1, 'John', 'Doe', 'HR', 50000),
+(2, 'Jane', 'Smith', 'HR', 60000),
+(3, 'Mike', 'Johnson', 'IT', 70000),
+(4, 'Sara', 'Williams', 'IT', 70000),
+(5, 'David', 'Brown', 'Finance', 55000),
+(6, 'Emily', 'Davis', 'Finance', 55000),
+(7, 'Chris', 'Miller', 'HR', 60000);
+
+SELECT 
+    EmployeeID,
+    FirstName,
+    LastName,
+    Department,
+    Salary,
+    RANK() OVER (PARTITION BY Department ORDER BY Salary DESC) AS SalaryRank
+FROM 
+    CompanySchema1.Employees;
+
+SELECT 
+    EmployeeID,
+    FirstName,
+    LastName,
+    Department,
+    Salary,
+    DENSE_RANK() OVER (PARTITION BY Department ORDER BY Salary DESC) AS DenseSalaryRank
+FROM 
+    CompanySchema1.Employees;
+
+
+SELECT 
+ROW_NUMBER() OVER (ORDER BY EmployeeID) AS RowNum,
+    EmployeeID,
+    FirstName,
+    LastName,
+    Department,
+    Salary
+    
+FROM 
+   CompanySchema1.Employees;
+
+CREATE TABLE Sales (
+    SaleID INT PRIMARY KEY,
+    SalespersonID INT,
+    Region NVARCHAR(50),
+    TotalSales DECIMAL(10, 2)
+);
+
+INSERT INTO Sales (SaleID, SalespersonID, Region, TotalSales) VALUES
+(1, 101, 'North', 5000),
+(2, 102, 'North', 7000),
+(3, 103, 'South', 6000),
+(4, 104, 'South', 4000),
+(5, 105, 'East', 5500),
+(6, 106, 'East', 6500),
+(7, 107, 'West', 4800);
+
+SELECT 
+    SaleID,
+    SalespersonID,
+    Region,
+    TotalSales
+FROM 
+    Sales S1
+WHERE 
+    TotalSales > (
+        SELECT AVG(TotalSales)
+        FROM Sales S2
+        WHERE S1.Region = S2.Region
+    );
+
+
+SELECT 
+    SaleID,
+    SalespersonID,
+    Region,
+    TotalSales,
+    (
+        SELECT COUNT(*)
+        FROM Sales S2
+        WHERE S2.Region = S1.Region AND S2.TotalSales > S1.TotalSales
+    ) + 1 AS SalesRank
+FROM 
+    Sales S1
+ORDER BY 
+    Region, SalesRank;
+
+	CREATE PROCEDURE GetHighEarningEmployees
+    @SalaryThreshold DECIMAL(10, 2)
+AS
+BEGIN
+    SELECT 
+        EmployeeID,
+        FirstName,
+        LastName,
+        Department,
+        Salary
+    FROM 
+        CompanySchema1.Employees
+    WHERE 
+        Salary > @SalaryThreshold;
+END;
+
+CREATE PROCEDURE UpdateEmployeeSalary
+    @Department NVARCHAR(50),
+    @IncrementAmount DECIMAL(10, 2)
+AS
+BEGIN
+    UPDATE CompanySchema1.Employees
+    SET Salary = Salary + @IncrementAmount
+    WHERE Department = @Department;
+END;
+
+EXEC GetHighEarningEmployees @SalaryThreshold = 55000;
+
+
+EXEC UpdateEmployeeSalary @Department = 'HR', @IncrementAmount = 3000;
+
+SELECT * FROM CompanySchema1.Employees;
+
+CREATE TABLE MonthlySales (
+    Month INT,
+    Region NVARCHAR(50),
+    TotalSales DECIMAL(10, 2)
+);
+
+INSERT INTO MonthlySales (Month, Region, TotalSales) VALUES
+(1, 'North', 10000),
+(2, 'North', 12000),
+(3, 'North', 11000),
+(1, 'South', 8000),
+(2, 'South', 7500),
+(3, 'South', 9000);
+
+SELECT 
+    Month,
+    Region,
+    TotalSales,
+    LAG(TotalSales) OVER (PARTITION BY Region ORDER BY Month) AS PreviousMonthSales,
+    TotalSales - LAG(TotalSales) OVER (PARTITION BY Region ORDER BY Month) AS SalesDifference
+FROM 
+    MonthlySales;
+
+SELECT 
+    Month,
+    Region,
+    TotalSales,
+    LAG(TotalSales) OVER (PARTITION BY Region ORDER BY Month) AS PreviousMonthSales,
+    TotalSales - LAG(TotalSales) OVER (PARTITION BY Region ORDER BY Month) AS SalesDifference,
+    CASE 
+        WHEN TotalSales < LAG(TotalSales) OVER (PARTITION BY Region ORDER BY Month) 
+        THEN 'Decrease'
+        ELSE 'No Decrease'
+    END AS SalesTrend
+FROM 
+    MonthlySales;
+
+
+
